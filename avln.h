@@ -1,8 +1,9 @@
-#include <Python.h>
-
-
 #ifndef AVLNODEHEADER
 #define AVLNODEHEADER
+
+
+#include <Python.h>
+
 
 
 typedef struct {
@@ -13,8 +14,9 @@ typedef struct {
 	short int height;
 
 	PyObject* parent;
-	PyObject* left;
-	PyObject* right;
+	//PyObject* left;
+	//PyObject* right;
+	PyObject* children[2];
 
 } AVLNode_O; 
 
@@ -22,7 +24,7 @@ typedef struct {
 
 static void avln_dealloc(AVLNode_O *self);
 static PyObject* avln_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
-static int avln_init(AVLNode_O* self, PyObject *args, PyObject *kwds);
+static int avln_init(AVLNode_O* self, PyObject *args);
 
 
 //int getBalanceFactor_C(PyObject* self);

@@ -1,16 +1,20 @@
+#ifndef AVLTREEHEADER
+#define AVLTREEHEADER
+
+
 #include <Python.h>
 #include "avln.h"
+#include "binary_cursor.h"
 
-
-#ifndef AVLTREEHEADER
-#define AVLTREEGEADER
 
 
 typedef struct {
 	PyObject_HEAD
-
+	
 	PyObject* root;
 	int size;
+
+	BinaryCursor* cursor;	
 
 
 } AVLTree_O; 
@@ -24,6 +28,7 @@ static void propagateHeight(AVLTree_O* tree, AVLNode_O* node);
 static int getBalance(AVLNode_O* node);
 static int getHeight(AVLNode_O* node);
 static int balance(AVLTree_O* tree, AVLNode_O* root);
+static void avl_tree_map(PyObject* node, void (*f)(AVLNode_O*));
 
 
 // Rotations //
@@ -56,6 +61,16 @@ static PyObject* avl_print_asc(AVLTree_O* self);
 static PyObject* avl_to_list(AVLTree_O* self);
 static PyObject* searchWraper(AVLTree_O* self, PyObject* args);
 static PyObject* deleteWraper(AVLTree_O* self, PyObject* args);
+static PyObject* avl_range(AVLTree_O* self, PyObject* args, PyObject* kwargs);
+static PyObject* avl_n_max(AVLTree_O* self, PyObject* args);
+static PyObject* avl_n_min(AVLTree_O* self, PyObject* args);
+
+// sequnece functions
+static Py_ssize_t tree_size(AVLTree_O* self);
+
+// iter functions
+static PyObject* avl_iter(AVLTree_O* self);
+static PyObject* avl_iter_next(AVLTree_O* self);
 
 
 #endif
