@@ -26,18 +26,28 @@ tree.push(arr)
 # Search: Returns value of first node where key is a match.
 tree.search(key)
 
-# Delete: Delets first found node matching key. Returns True if item is deleted, False if key is not found
-tree.delete(key)
-
-# Get subsets of tree
 """
-Returns a tree containing values in range min to max
+Delets first found node matching key. 
+
+arg:
+	key: the key to be deleted or a sequence of keys.	
+return:
+	True if item is deleted, False if key is not found. None if a sequence is used.
+
+"""
+tree.delete(key)
+tree.delete([key1, key2])
+
+"""
+Get subsets of tree
 args:
 	min : minimum value or None
 	max : maximum value or None
 kwargs:
-	minOp: >= by default
-	maxOp: <= by default	
+	minOp: determines if subset includes or excludes minimum. ">=" by default
+	maxOp: determines if subset includes or excludes maximum. "<=" by default
+return:
+	a tree containing values in range min to max	
 """
 tree.range(10, 30, minOp=">", maxOp="<")
 

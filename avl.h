@@ -11,7 +11,7 @@
 typedef struct {
 	PyObject_HEAD
 	
-	PyObject* root;
+	AVLNode* root;
 	int size;
 
 	BinaryCursor* cursor;	
@@ -21,39 +21,41 @@ typedef struct {
 
 
 
-static void avl_dealloc(AVLTree_O *self);
+static void avl_dealloc(AVLTree_O* self);
 static int avl_init(AVLTree_O* self, PyObject *args, PyObject *kwds);
-static void findMeAParent(AVLTree_O* tree, PyObject* root, PyObject* orphan);
-static void propagateHeight(AVLTree_O* tree, AVLNode_O* node);
-static int getBalance(AVLNode_O* node);
-static int getHeight(AVLNode_O* node);
-static int balance(AVLTree_O* tree, AVLNode_O* root);
-static void avl_tree_map(PyObject* node, void (*f)(AVLNode_O*));
+static void findMeAParent(AVLTree_O* tree, AVLNode* root, AVLNode* orphan);
+static void propagateHeight(AVLTree_O* tree, AVLNode* node);
+static int getBalance(AVLNode* node);
+static int getHeight(AVLNode* node);
+static int balance(AVLTree_O* tree, AVLNode* root);
+
 
 
 // Rotations //
-void rotateLeft(AVLTree_O* tree, PyObject* root);
-void rotateDoubleLeft(AVLTree_O* tree, PyObject* root);
-void rotateRight(AVLTree_O* tree, PyObject* root);
-void rotateDoubleRight(AVLTree_O* tree, PyObject* root);
+void rotateLeft(AVLTree_O* tree, AVLNode* root);
+void rotateDoubleLeft(AVLTree_O* tree, AVLNode* root);
+void rotateRight(AVLTree_O* tree, AVLNode* root);
+void rotateDoubleRight(AVLTree_O* tree, AVLNode* root);
 
 //PyObject* getBalanceFactor(PyObject* self, PyObject* args, PyObject* kwds);
 //PyObject* getSubTreeHeight(PyObject* self, PyObject* args, PyObject* kwds);
 
 // tree operation helpers
-static void parentSwap(AVLTree_O* tree, AVLNode_O* parent, AVLNode_O* child);
-static int isLeftChildOfParent(AVLNode_O* node);
+static void parentSwap(AVLTree_O* tree, AVLNode* parent, AVLNode* child);
+static int isLeftChildOfParent(AVLNode* node);
 
 
 // diagnostic
-static PyObject* avl_print_traverse(PyObject* node);
+static PyObject* avl_print_traverse(AVLNode* node);
 static PyObject* balanceTest(AVLTree_O* self);
+static PyObject* heightTest(AVLTree_O* self);
 
 // Python exposed helper functions
-static int getHeightRecursive(AVLNode_O* node);
-static int getBalanceRecursive(AVLNode_O* node);
-static void balanceTestRecursive(AVLNode_O* node, int* nodeBalanceList, int* counter);
-static void appendElements(PyObject* list, PyObject* node);
+static int getHeightRecursive(AVLNode* node);
+static int getBalanceRecursive(AVLNode* node);
+static void appendElements(PyObject* list, AVLNode* node);
+static void avl_tree_map(AVLNode* node, void (*f)(AVLNode*));
+static PyObject* notImplemented(void);
 
 // Python exposed functions
 static PyObject* avl_push(AVLTree_O* self, PyObject* args);

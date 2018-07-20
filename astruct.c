@@ -1,5 +1,4 @@
 #include <Python.h>
-#include "avln.c"
 #include "avl.c"
 
 
@@ -16,17 +15,13 @@ static PyModuleDef astruct = {
 PyMODINIT_FUNC PyInit_astruct(void) {
     PyObject *m;
 
-    if (PyType_Ready(&AVLNode_T) < 0) { return NULL; }
-
 	if (PyType_Ready(&AVLTree_T) < 0) { return NULL; }
 
     m = PyModule_Create(&astruct);
     if (m == NULL)
         return NULL;
 
-    Py_INCREF(&AVLNode_T);
 	Py_INCREF(&AVLTree_T);
-    PyModule_AddObject(m, "AVLNode", (PyObject *) &AVLNode_T);
 	PyModule_AddObject(m, "AVLTree", (PyObject *) &AVLTree_T);
     return m;
 };

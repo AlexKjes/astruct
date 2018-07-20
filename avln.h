@@ -4,27 +4,22 @@
 
 #include <Python.h>
 
-
-
-typedef struct {
-	PyObject_HEAD
+typedef	struct AVLNode AVLNode;
+struct AVLNode{
 	PyObject* key;
 	PyObject* value;
 
 	short int height;
 
-	PyObject* parent;
-	//PyObject* left;
-	//PyObject* right;
-	PyObject* children[2];
+	struct AVLNode* parent;
+	struct AVLNode* children[2];
 
-} AVLNode_O; 
+}; 
 
 
 
-static void avln_dealloc(AVLNode_O *self);
-static PyObject* avln_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
-static int avln_init(AVLNode_O* self, PyObject *args);
+static void avln_dealloc(AVLNode* self);
+static AVLNode* avln_init(PyObject* key, PyObject* value);
 
 
 //int getBalanceFactor_C(PyObject* self);

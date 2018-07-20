@@ -20,6 +20,8 @@ static PyMethodDef avl_methods[] = {
 	"Returns the tree as a list."},
 	{"balance_test", (PyCFunction) balanceTest, METH_NOARGS,
 	 "Returns True if balance of all nodes are in range [-2, 2]. Only for testing purposes."},
+	{"height_test", (PyCFunction) heightTest, METH_NOARGS,
+	 "Returns True if true height = cached height"},
 	{"search", (PyCFunction) searchWraper, METH_VARARGS,
 	 "Searches for a key. Returns value first match or None, if no match is found."},
 	{"delete", (PyCFunction) deleteWraper, METH_VARARGS,
@@ -56,10 +58,8 @@ static PyTypeObject AVLTree_T = {
 static int avl_init(AVLTree_O* self, PyObject *args, PyObject *kwds) {
 
 	self->cursor = NULL;
-
-	self->root = Py_BuildValue("");
+	self->root = NULL;
 	self->size = 0;
-	Py_INCREF(self);	
 
 	return 0;
 
@@ -68,121 +68,117 @@ static int avl_init(AVLTree_O* self, PyObject *args, PyObject *kwds) {
 
 static void avl_dealloc(AVLTree_O* self){
 
-	Py_XDECREF(self->root);
+	avl_tree_map(self->root, avln_dealloc);
     Py_TYPE(self)->tp_free((PyObject *) self);
 
 }
 
 // recursively appending node to tree	
-static void findMeAParent(AVLTree_O* tree, PyObject* root, PyObject* orphan){
+static void findMeAParent(AVLTree_O* tree, AVLNode* root, AVLNode* orphan){
 	
-	AVLNode_O* rt = (AVLNode_O*) root;
-	AVLNode_O* orphy = (AVLNode_O*) orphan;	
+	AVLNode* rt = root;
+	AVLNode* orphy = orphan;	
 
-	if (root == Py_None) {
+	if (!root) {
 		tree->root = orphan;
 		return;
 	} 
 
 	if (PyObject_RichCompareBool(rt->key, orphy->key, Py_GE)){
-		if (rt->children[0] == Py_None) {
-			Py_INCREF(rt);
+		if (!rt->children[0]) {
 			rt->children[0] = orphan;
 			orphy->parent = root;
-			//propagateHeight(tree, rt);
 		} else { findMeAParent(tree, rt->children[0], orphan); }
 	} else {
-		if (rt->children[1] == Py_None){
-			Py_INCREF(rt);
+		if (!rt->children[1]){
 			rt->children[1] = orphan;
 			orphy->parent = root;
-			//propagateHeight(tree, rt);
 		} else { findMeAParent(tree, rt->children[1], orphan); }
 	}	
 
 }
 
-static void propagateHeight(AVLTree_O* tree, AVLNode_O* node){
+static void propagateHeight(AVLTree_O* tree, AVLNode* node){
 	
-	if ((PyObject*)node == Py_None) return;
+	if (!node) return;
 
 	int _height = getHeight(node);
-	
-	if (_height != node->height){
-		node->height = _height;
-		balance(tree, node);		
+	int hc = _height != node->height;
+	int b = getBalance(node);
+	if (hc || b > 1 || b < -1){
 		//TODO remember py recursion stuff
-		propagateHeight(tree, (AVLNode_O*) node->parent);	
+		node->height = _height;		
+		balance(tree, node);
+		propagateHeight(tree, node->parent);
+		
 	}	
 
 }
 
-static int balance(AVLTree_O* tree, AVLNode_O* node){
-
-	if (getBalance(node) < -1){
-		if (getBalance((AVLNode_O*)node->children[1]) < 0) {
-			rotateLeft(tree, (PyObject*) node);
-		} else if (getBalance((AVLNode_O*)node->children[1]) > 0) { rotateDoubleLeft(tree, (PyObject*) node); }
-		//else { printf("Something is horribly wrong\n"); }
+static int balance(AVLTree_O* tree, AVLNode* node){
+	int b = getBalance(node);
+	if (b < -1){
+		if (getBalance(node->children[1]) < 0) {
+			rotateLeft(tree, node); 
+		} else { rotateDoubleLeft(tree, node); }
 		return 1;
-	} else if (getBalance(node) > 1){
-		if (getBalance((AVLNode_O*) node->children[0]) > 0) {
-			rotateRight(tree, (PyObject*) node);
-		} else if (getBalance((AVLNode_O*)node->children[0]) < 0) { rotateDoubleRight(tree, (PyObject*) node); }
-		//else { printf("Something is horribly wrong\n"); }
-		return 1;
+	} else if (b > 1){
+		if (getBalance(node->children[0]) > 0) {
+			rotateRight(tree, node); 
+		} else { rotateDoubleRight(tree, node); }
+		return 1;	
 	}
 	return 0;
 }
 
-static int getHeight(AVLNode_O* node){
-	if ((PyObject*)node == Py_None) return 0;
+static int getHeight(AVLNode* node){
+	if (!node) return 0;
 	int l, r;
 	l = r = 0;
-	if (node->children[1] != Py_None) r = ((AVLNode_O*)node->children[1])->height;
-	if (node->children[0] != Py_None) l = ((AVLNode_O*)node->children[0])->height;
+	if (node->children[1]) r = node->children[1]->height;
+	if (node->children[0]) l = node->children[0]->height;
 
 	return ((l > r) ? l : r) + 1;
 
 }
 
-static int getBalance(AVLNode_O* node){
-	if ((PyObject*)node == Py_None) return 0;
+static int getBalance(AVLNode* node){
+	if (!node) return 0;
 	int l, r;
 	l = r = 0;
-	if (node->children[1] != Py_None) r = ((AVLNode_O*)node->children[1])->height;
-	if (node->children[0] != Py_None) l = ((AVLNode_O*)node->children[0])->height;
+	if (node->children[1]) r = node->children[1]->height;
+	if (node->children[0]) l = node->children[0]->height;
 
 	return l - r;
 }
 
 /* single left rotation
-1
- \        3
-  3 -->  / \
-   \    1   5
-	5
+rt
+ \        r
+  r -->  / \
+   \    rt  rr
+	rr
 */
-void rotateLeft(AVLTree_O* tree, PyObject* root){
+void rotateLeft(AVLTree_O* tree, AVLNode* root){
 
-	AVLNode_O* rt = (AVLNode_O*) root;
-	AVLNode_O* rtp = (rt->parent != Py_None) ? (AVLNode_O*) rt->parent : NULL;
-	AVLNode_O* r = (AVLNode_O*) rt->children[1];
+	AVLNode* rt = root;
+	AVLNode* rtp = (rt->parent) ? (AVLNode*) rt->parent : NULL;
+	AVLNode* r = rt->children[1];
 	
 
 	if (!rtp) { 
-		tree->root = (PyObject*)r;
-		r->parent = Py_BuildValue("");
+		tree->root = r;
+		r->parent = NULL;
 	} else {
-		r->parent = (PyObject*)rtp;
-		if (root == rtp->children[0]) { rtp->children[0] = (PyObject*)r; }
-		else { rtp->children[1] = (PyObject*)r; }
+		r->parent = rtp;
+		if (root == rtp->children[0]) { rtp->children[0] = r; }
+		else { rtp->children[1] = r; }
 	} 
-	rt->parent = (PyObject*)r;
+	rt->parent = r;
 	rt->children[1] = r->children[0];
-	r->children[0] = (PyObject*)rt;
+	r->children[0] = rt;
 
-	if (rt->children[1] != Py_None) ((AVLNode_O*)rt->children[1])->parent = (PyObject*) rt;
+	if (rt->children[1]) rt->children[1]->parent = rt;
 
 	rt->height = getHeight(rt);
 
@@ -195,30 +191,30 @@ void rotateLeft(AVLTree_O* tree, PyObject* root){
  /      1   3
 2
 */
-void rotateDoubleLeft(AVLTree_O* tree, PyObject* root){
+void rotateDoubleLeft(AVLTree_O* tree, AVLNode* root){
 
-	AVLNode_O* rt = (AVLNode_O*) root;
-	AVLNode_O* rtp = (rt->parent != Py_None) ? (AVLNode_O*) rt->parent : NULL;
-	AVLNode_O* r = (AVLNode_O*)rt->children[1];
-	AVLNode_O* rl = (AVLNode_O*)r->children[0];
+	AVLNode* rt = root;
+	AVLNode* rtp = (rt->parent) ? rt->parent : NULL;
+	AVLNode* r = rt->children[1];
+	AVLNode* rl = r->children[0];
 	
 	if (!rtp) { 
-		tree->root = (PyObject*)rl; 
-		rl->parent = Py_BuildValue("");
+		tree->root = rl; 
+		rl->parent = NULL;
 	} else {
 		rl->parent = rt->parent;
-		if (root == rtp->children[0]) { rtp->children[0] = (PyObject*)rl; }
-		else { rtp->children[1] = (PyObject*)rl; }
+		if (root == rtp->children[0]) { rtp->children[0] = rl; }
+		else { rtp->children[1] = rl; }
 	}
 	r->children[0] = rl->children[1];
 	rt->children[1] = rl->children[0];
-	r->parent = (PyObject*) rl;
-	rt->parent = (PyObject*) rl;
-	rl->children[0] = (PyObject*) rt;
-	rl->children[1] = (PyObject*) r;
+	r->parent = rl;
+	rt->parent = rl;
+	rl->children[0] = rt;
+	rl->children[1] = r;
 
-	if (rt->children[1] != Py_None) ((AVLNode_O*)rt->children[1])->parent = (PyObject*) rt;
-	if (r->children[0] != Py_None) ((AVLNode_O*)r->children[0])->parent = (PyObject*) r;	
+	if (rt->children[1]) rt->children[1]->parent = rt;
+	if (r->children[0]) r->children[0]->parent = r;	
 	
 	rt->height = getHeight(rt);
 	r->height = getHeight(r);
@@ -226,55 +222,55 @@ void rotateDoubleLeft(AVLTree_O* tree, PyObject* root){
 }
 
 // right rotation, same as mirrored left rotation
-void rotateRight(AVLTree_O* tree, PyObject* root){
+void rotateRight(AVLTree_O* tree, AVLNode* root){
 
-	AVLNode_O* rt = (AVLNode_O*) root;
-	AVLNode_O* rtp = (rt->parent != Py_None) ? (AVLNode_O*) rt->parent : NULL;
-	AVLNode_O* l = (AVLNode_O*) rt->children[0];
+	AVLNode* rt = root;
+	AVLNode* rtp = (rt->parent) ? rt->parent : NULL;
+	AVLNode* l = rt->children[0];
 	
 	if (!rtp) { 
-		tree->root = (PyObject*) l; 
-		l->parent = Py_BuildValue("");
+		tree->root = l; 
+		l->parent = NULL;
 	} else {
 		l->parent = rt->parent;
-		if (root == rtp->children[0]) { rtp->children[0] = (PyObject*)l; }
-		else { rtp->children[1] = (PyObject*) l; }
+		if (root == rtp->children[0]) { rtp->children[0] = l; }
+		else { rtp->children[1] = l; }
 	}
-	rt->parent = (PyObject*) l;
+	rt->parent = l;
 	rt->children[0] = l->children[1];
-	l->children[1] = (PyObject*)rt;
+	l->children[1] = rt;
 
-	if (rt->children[0] != Py_None) ((AVLNode_O*)rt->children[0])->parent = (PyObject*) rt;
+	if (rt->children[0]) rt->children[0]->parent = rt;
 	
 	rt->height = getHeight(rt);
 
 }
 
 // doubel right rotation. Same as doubleLeft only mirrored
-void rotateDoubleRight(AVLTree_O* tree, PyObject* root){
+void rotateDoubleRight(AVLTree_O* tree, AVLNode* root){
 
-	AVLNode_O* rt = (AVLNode_O*) root;
-	AVLNode_O* rtp = (rt->parent != Py_None) ? (AVLNode_O*) rt->parent : NULL;
-	AVLNode_O* l = (AVLNode_O*)rt->children[0];
-	AVLNode_O* lr = (AVLNode_O*)l->children[1];
+	AVLNode* rt = root;
+	AVLNode* rtp = (rt->parent) ? rt->parent : NULL;
+	AVLNode* l = rt->children[0];
+	AVLNode* lr = l->children[1];
 	
 	if (!rtp) { 
-		tree->root = (PyObject*) lr;
-		lr->parent = Py_BuildValue("");		
+		tree->root = lr;
+		lr->parent = NULL;		
 	} else {
 		lr->parent = rt->parent;
-		if (root == rtp->children[0]) { rtp->children[0] = (PyObject*) lr; }
-		else { rtp->children[1] = (PyObject*) lr; }
+		if (root == rtp->children[0]) { rtp->children[0] = lr; }
+		else { rtp->children[1] = lr; }
 	}
 	l->children[1] = lr->children[0];
 	rt->children[0] = lr->children[1];
-	l->parent = (PyObject*) lr;
-	rt->parent = (PyObject*) lr;
-	lr->children[1] = (PyObject*) rt;
-	lr->children[0] = (PyObject*) l;
+	l->parent = lr;
+	rt->parent = lr;
+	lr->children[1] = rt;
+	lr->children[0] = l;
 
-	if (rt->children[0] != Py_None) ((AVLNode_O*)rt->children[0])->parent = (PyObject*) rt;
-	if (l->children[1] != Py_None) ((AVLNode_O*)l->children[1])->parent = (PyObject*) l;	
+	if (rt->children[0]) rt->children[0]->parent = rt;
+	if (l->children[1]) l->children[1]->parent = l;	
 
 	rt->height = getHeight(rt);
 	l->height = getHeight(l);
@@ -282,65 +278,92 @@ void rotateDoubleRight(AVLTree_O* tree, PyObject* root){
 }
 
 
-static PyObject* avl_search(AVLTree_O* self, PyObject* value){
+static AVLNode* avl_search(AVLTree_O* self, PyObject* key){
 
-	AVLNode_O* n = (AVLNode_O*) self->root;
+	AVLNode* n = self->root;
 
 	while (1){
-		if ((PyObject*) n == Py_None) return Py_None;
-		if (PyObject_RichCompareBool(n->key, value, Py_GT)){
-			n = (AVLNode_O*) n->children[0];
-		} else if ((PyObject_RichCompareBool(n->key, value, Py_LT))){
-			n = (AVLNode_O*) n->children[1];
-		} else {
-			return (PyObject*) n;
-		}
+		if (!n) return NULL;
+		if (PyObject_RichCompareBool(n->key, key, Py_GT)){
+			n = n->children[0];
+		} else if (PyObject_RichCompareBool(n->key, key, Py_LT)){
+			n = n->children[1];
+		} else if (PyObject_RichCompareBool(n->key, key, Py_EQ)){
+			return n;
+		} else return NULL;
 
 	}	
 
 }
 
 // deletes first instance of key found
-static PyObject* avl_delete(AVLTree_O* self, PyObject* value){
-
-	AVLNode_O* n = (AVLNode_O*) avl_search(self, value);
-	if ((PyObject*)n == Py_None) return Py_False;
+static AVLNode* avl_delete(AVLTree_O* self, PyObject* value){
 	
-	// if n has no children
-	if (n->children[0] == Py_None && n->children[1] == Py_None){
-		if (n->parent != Py_None){
+	AVLNode* propagateFrom = NULL;
+	AVLNode* n = avl_search(self, value);
+	AVLNode* replacement = NULL;
+	if (!n) return NULL;
+	// has no children
+	if (!n->children[0] && !n->children[1]){
+		if (n->parent){
 			if (isLeftChildOfParent(n)){
-				((AVLNode_O*)n->parent)->children[0] = Py_None;
-			} else { ((AVLNode_O*)n->parent)->children[1] = Py_None; }
-		}
+				n->parent->children[0] = NULL;
+			} else { n->parent->children[1] = NULL; }
+			propagateFrom = n->parent;
+		} 
 		
 	// if n has one child
-	} else if ((n->children[0] == Py_None || n->children[1] == Py_None) && (n->children[0] != n->children[1])){
-		AVLNode_O* child = (AVLNode_O*)((n->children[0] != Py_None) ? n->children[0] : n->children[1]);
-		parentSwap(self, n, child);
-	} else {
-		// if node to be deleted has two children
-		AVLNode_O* replacement = (AVLNode_O*)n->children[1];
-		// find left most node in subtree
-		while (replacement->children[0] != Py_None){
-			replacement = (AVLNode_O*)replacement->children[0];
-		}
-		// if left most node has right child
-		if (replacement->children[1] != Py_None){
-			((AVLNode_O*)replacement->parent)->children[0] = replacement->children[1];
-			((AVLNode_O*)replacement->children[1])->parent = replacement->parent;
-		}
-		// replace 
-		replacement->children[0] = n->children[0];
-		replacement->children[1] = n->children[1];
+	} else if ((!n->children[0] && n->children[1]) || (n->children[0] && !n->children[1])){
+		replacement = (n->children[0]) ? n->children[0] : n->children[1];
+		replacement->parent = n->parent;
 		parentSwap(self, n, replacement);
+		propagateFrom = replacement->parent;
+	// node has two children
+	} else {
+		int lr = (getBalance(n) > 0) ? 1 : 0;
+		replacement = n->children[1 - lr];
+		// replacement has no children
+		if (!replacement->children[lr]){
+			propagateFrom = replacement;
+			replacement->parent = n->parent;
+			replacement->children[lr] = n->children[lr];
+			n->children[lr]->parent = replacement;
+			parentSwap(self, n, replacement);
+			
+		} else {
+			// gong left
+			while(replacement->children[lr]){
+				replacement = replacement->children[lr];
+			}
+			propagateFrom = replacement->parent;
+			// if left most node in subtree has a right child
+			if (replacement->children[1-lr]){
+				AVLNode* rc = replacement->children[1-lr];
+				rc->parent = replacement->parent;
+				replacement->parent->children[lr] = rc;
+			} else {
+				replacement->parent->children[lr] = NULL;
+			}
+				replacement->parent = n->parent;
+				parentSwap(self, n, replacement);
+				replacement->children[0] = n->children[0];
+				replacement->children[1] = n->children[1];
+				n->children[0]->parent = n->children[1]->parent = replacement;
+				replacement->height = n->height;
+		}
 	}
+	// if tree root was deleted
+	if (!n->parent)
+		self->root = replacement;	
+
+	n->parent = NULL;
+	n->children[0] = NULL;
+	n->children[1] = NULL;
 
 	self->size--;
-	Py_XDECREF(n);
-		
+	avln_dealloc(n);
 
-	return Py_True;
+	return propagateFrom;
 }
 
 
@@ -348,26 +371,25 @@ static PyObject* avl_delete(AVLTree_O* self, PyObject* value){
 // Operation helpers //
 ///////////////////////
 
-static int isLeftChildOfParent(AVLNode_O* node){
+static int isLeftChildOfParent(AVLNode* node){
 	
-	if ((PyObject*) node == ((AVLNode_O*)node->parent)->children[0]) return 1;
-
+	if (node == node->parent->children[0]) return 1;
 	return 0;
 
 }
 
-static void parentSwap(AVLTree_O* tree, AVLNode_O* parent, AVLNode_O* child){
+static void parentSwap(AVLTree_O* tree, AVLNode* parent, AVLNode* child){
 	
-	if (parent->parent == Py_None) {
-		tree->root = (PyObject*)child;
+	if (!parent->parent) {
+		tree->root = child;
 		return;
 	}
 	child->parent = parent->parent;
 	if (isLeftChildOfParent(parent)){
-		((AVLNode_O*)parent->parent)->children[0] = (PyObject*)child;
+		parent->parent->children[0] = child;
 		return;
 	}
-	((AVLNode_O*)parent->parent)->children[1] = (PyObject*)child;
+	parent->parent->children[1] = child;
 	return;
 
 }
@@ -380,30 +402,24 @@ static void parentSwap(AVLTree_O* tree, AVLNode_O* parent, AVLNode_O* child){
 // python exposed helpers //
 ////////////////////////////
 
-//static PyObject* 
-
-
-static void refinc(AVLNode_O* node){
-	Py_INCREF(node);
-}
 
 // do thing to each node in tree
-static void avl_tree_map(PyObject* node, void (*f)(AVLNode_O*)){
+static void avl_tree_map(AVLNode* node, void (*f)(AVLNode*)){
 	
-	if (node == Py_None) return;
+	if (!node) return;
 
-	avl_tree_map(((AVLNode_O*)node)->children[0], f);
-	f((AVLNode_O*)node);
-	avl_tree_map(((AVLNode_O*)node)->children[1], f);
+	avl_tree_map(node->children[0], f);
+	f(node);
+	avl_tree_map(node->children[1], f);
 
 }
 
 
-static void appendElements(PyObject* list, PyObject* node){
+static void appendElements(PyObject* list, AVLNode* node){
 	
-	if (node == Py_None) return;
+	if (!node) return;
 	else {
-		AVLNode_O* n = (AVLNode_O*) node;
+		AVLNode* n = node;
 		appendElements(list, n->children[0]);
 		PyList_Append(list, Py_BuildValue("OO", n->key, n->value));
 		appendElements(list, n->children[1]);
@@ -412,10 +428,10 @@ static void appendElements(PyObject* list, PyObject* node){
 }
 
 // recursively prints key/value in ascending order
-static PyObject* avl_print_traverse(PyObject* node){
-	AVLNode_O* n = (AVLNode_O*)node;
+static PyObject* avl_print_traverse(AVLNode* node){
+	AVLNode* n = node;
 
-	if (node == Py_None) { return Py_BuildValue(""); }
+	if (!node) { return Py_BuildValue(""); }
 	avl_print_traverse(n->children[0]);
 	printf("%s: %s\n", PyUnicode_AsUTF8(PyObject_Repr(n->key)), PyUnicode_AsUTF8(PyObject_Repr(n->value)));
 	avl_print_traverse(n->children[1]);
@@ -423,39 +439,27 @@ static PyObject* avl_print_traverse(PyObject* node){
 }
 
 // finds height of node recursively
-static int getHeightRecursive(AVLNode_O* node){
-	if ((PyObject*)node == Py_None) return 0;
+static int getHeightRecursive(AVLNode* node){
+	if (!node) return 0;
 	
 	int l, r;
 	l = r = 0;
-	if (node->children[1] != Py_None) r = getHeightRecursive((AVLNode_O*)node->children[1]);
-	if (node->children[0] != Py_None) l = getHeightRecursive((AVLNode_O*)node->children[0]); 
+	if (node->children[1]) r = getHeightRecursive(node->children[1]);
+	if (node->children[0]) l = getHeightRecursive(node->children[0]); 
 
 	return ((l > r) ? l : r) + 1;
 }
 
 // returns balance from recursive height
-static int getBalanceRecursive(AVLNode_O* node){
-	if ((PyObject*)node == Py_None) return 0;
+static int getBalanceRecursive(AVLNode* node){
+	if (!node) return 0;
 	
 	int l, r;
-	l = r = 0;
-	if (node->children[1] != Py_None) r = getHeightRecursive((AVLNode_O*)node->children[1]);
-	if (node->children[0] != Py_None) l = getHeightRecursive((AVLNode_O*)node->children[0]); 
+	r = getHeightRecursive(node->children[1]);
+	l = getHeightRecursive(node->children[0]); 
 
 	return l - r;
 }
-
-// recursively calculates and puts balance of all nodes in list
-static void balanceTestRecursive(AVLNode_O* node, int* nodeBalanceList, int* counter){
-	if ((PyObject*)node == Py_None) return;
-	balanceTestRecursive((AVLNode_O*)node->children[0], nodeBalanceList, counter);
-	nodeBalanceList[*counter] = getBalanceRecursive(node);
-	(*counter)++;
-	balanceTestRecursive((AVLNode_O*)node->children[1], nodeBalanceList, counter);
-}
-
-
 
 
 /* 
@@ -469,20 +473,59 @@ static PyObject* avl_print_asc(AVLTree_O* self){
 }
 
 // Checks that the tree is balanced from seperatly calculated height
-static PyObject* balanceTest(AVLTree_O* self){
-	int list[self->size];
-	int counter = 0;
-	balanceTestRecursive((AVLNode_O*)self->root, list, &counter);
-	for (int i=0; i<self->size;i++){
-		if (list[i] > 2 || list[i]< -2){
-			return Py_False;
-		}
+static PyObject* heightTest(AVLTree_O* self){
+	BinaryCursor* bc = bc_init(self->root, 0);
+	int err = 0;
+	while (bc_moveToNextNode(bc)){
+		AVLNode* n = bc_getCurrentNode(bc);
+		int rh = getHeightRecursive(n);
+		int h = n->height;
+		if (rh != h){
+			printf("height: %d, should be: %d\n", h, rh);
+			err = 1;
+			//bc_dealloc(bc);			
+			//Py_INCREF(Py_False);			
+			//return Py_False;	
+		}		
 	}
+	bc_dealloc(bc);	
+	if (err) {				
+		Py_INCREF(Py_False);			
+		return Py_False;	
+	}	
+	Py_INCREF(Py_True);
 	return Py_True;
 
 }
 
-/// Python exposed methods
+// Checks that the tree is balanced from seperatly calculated height
+static PyObject* balanceTest(AVLTree_O* self){
+	BinaryCursor* bc = bc_init(self->root, 0);
+
+	while (bc_moveToNextNode(bc)){
+		AVLNode* n = bc_getCurrentNode(bc);
+		int b = getBalanceRecursive(n);
+		if (b > 2 || b < -2){
+			printf("%d, %d, %d\n", b, n->height, getHeightRecursive(n));
+			bc_dealloc(bc);
+			Py_INCREF(Py_False);			
+			return Py_False;
+		}
+	}
+	bc_dealloc(bc);
+	Py_INCREF(Py_True);
+	return Py_True;
+
+}
+
+static PyObject* notImplemented(void){
+	return Py_NotImplemented;
+}
+
+
+//////////////////////////////
+/// Python exposed methods ///
+//////////////////////////////
 
 static PyObject* avl_push(AVLTree_O* self, PyObject* args){
 	
@@ -496,32 +539,27 @@ static PyObject* avl_push(AVLTree_O* self, PyObject* args){
 		
 	if (is_seq){
 		int seq_size = PySequence_Size(krr);
-		PyObject* nodes[seq_size];
+		AVLNode* nodes[seq_size];
 		
 		for (int i=0;i<seq_size;i++){
-			
-			PyObject* arg = PySequence_Tuple(PySequence_GetItem(krr, i));
-
-			nodes[i] = PyObject_CallObject((PyObject *) &AVLNode_T, arg);
-			Py_INCREF(nodes[i]);	
-
-			findMeAParent(self, self->root, nodes[i]);		
+			PyObject* arg = PySequence_GetItem(krr, i);
+			nodes[i] = avln_init(PySequence_GetItem(arg, 0), PySequence_GetItem(arg, 1));
+			findMeAParent(self, self->root, nodes[i]);	
+			Py_XDECREF(arg);	
 		}
 		
 		for (int i=0;i<seq_size;i++){		
-			propagateHeight(self, (AVLNode_O*)((AVLNode_O*)nodes[i])->parent);
+			propagateHeight(self, nodes[i]->parent);
 		}
 		
 		self->size += seq_size;
 		
 	// single node insert
 	} else {
-		PyObject* node = PyObject_CallObject((PyObject *) &AVLNode_T, args);
-		Py_INCREF(node);	
-
+		AVLNode* node = avln_init(krr, val);
 		self->size++;
 		findMeAParent(self, self->root, node);
-		propagateHeight(self, (AVLNode_O*)((AVLNode_O*)node)->parent);
+		propagateHeight(self, node->parent);
 	}
 
 	return Py_BuildValue("");
@@ -540,9 +578,9 @@ static PyObject* searchWraper(AVLTree_O* self, PyObject* args){
 	PyObject* key = NULL;
 	PyArg_ParseTuple(args, "O", &key);
 
-	PyObject* ret = avl_search(self, key);
-	if (ret == Py_None){ return ret; }
-	return ((AVLNode_O*)ret)->value;
+	AVLNode* ret = avl_search(self, key);
+	if (!ret){ return Py_None; }
+	return ret->value;
 
 }
 
@@ -550,13 +588,46 @@ static PyObject* deleteWraper(AVLTree_O* self, PyObject* args){
 	
 	PyObject* key = NULL;
 	PyArg_ParseTuple(args, "O", &key);
-	
-	return avl_delete(self, key);
 
+	if (PySequence_Check(key)){
+		
+		int len = PySequence_Size(key);
+		AVLNode* list[len];
+		for (int i=0;i<len;i++){
+			PyObject* tmp = PySequence_GetItem(key, i);
+			list[i] = avl_delete(self, tmp); 
+			if (list[i])
+				propagateHeight(self, list[i]);
+			Py_XDECREF(tmp);
+		}
+		/*
+		for (int i=0;i<len;i++){
+			if (list[i] != Py_None){
+				AVLNode* n = (AVLNode*)list[len-1-i];
+				//if (n->children[0] != Py_None && n->children[1] != Py_None)
+					propagateHeight(self, n);
+			}
+		}
+		*/
+		Py_INCREF(Py_None);
+		return Py_None;
+		
+
+	} else {
+		AVLNode* ret = avl_delete(self, key);
+		if (ret){
+			propagateHeight(self, ret);
+			Py_INCREF(Py_True);
+			return Py_True;
+		}
+	}
+	Py_INCREF(Py_False);
+	return Py_False;
+	
 }
 
 static PyObject* avl_range(AVLTree_O* self, PyObject* args, PyObject* kwargs){
-	if (self->root == Py_None) return Py_BuildValue("");
+	if (!self->root) return Py_BuildValue("");
 
 	PyObject* max = Py_None;
 	PyObject* min = Py_None;
@@ -566,7 +637,7 @@ static PyObject* avl_range(AVLTree_O* self, PyObject* args, PyObject* kwargs){
 	int mnOp = Py_LE;
 
 	PyObject* list = Py_BuildValue("[]");
-	BinaryCursor* cursor = bc_init((AVLNode_O*)self->root, 0);
+	BinaryCursor* cursor = bc_init((AVLNode*)self->root, 0);
 
 	char* charList[] = {"min", "max", "minOp", "mmaxOp", NULL};
 	
@@ -579,7 +650,7 @@ static PyObject* avl_range(AVLTree_O* self, PyObject* args, PyObject* kwargs){
 	if (strcmp(">", minOp) == 0) mnOp = Py_LT;
 	
 	while (bc_moveToNextNode_minMax(cursor, max, min, mxOp, mnOp)){
-		AVLNode_O* n = bc_getCurrentNode(cursor);
+		AVLNode* n = bc_getCurrentNode(cursor);
 		PyObject_CallMethodObjArgs(list, Py_BuildValue("s", "append"), Py_BuildValue("(OO)", n->key, n->value), NULL);
 	}
 	avl_push((AVLTree_O*)tree, Py_BuildValue("(O)", list));
@@ -593,11 +664,11 @@ static PyObject* avl_n_max(AVLTree_O* self, PyObject* args){
 	PyArg_ParseTuple(args, "i", &n);
 	PyObject* tree = PyObject_CallObject((PyObject *) &AVLTree_T, NULL);
 	PyObject* list = Py_BuildValue("[]");	
-	BinaryCursor* bc = bc_init((AVLNode_O*)self->root, 1);
+	BinaryCursor* bc = bc_init((AVLNode*)self->root, 1);
 
 	for (int i=0;i<n;i++){
 		if (!bc_moveToNextNode(bc)) break;
-		AVLNode_O* node = bc_getCurrentNode(bc);
+		AVLNode* node = bc_getCurrentNode(bc);
 		PyObject_CallMethodObjArgs(list, Py_BuildValue("s", "append"), Py_BuildValue("(OO)", node->key, node->value), NULL);
 	}
 
@@ -614,11 +685,11 @@ static PyObject* avl_n_min(AVLTree_O* self, PyObject* args){
 	PyArg_ParseTuple(args, "i", &n);
 	PyObject* tree = PyObject_CallObject((PyObject *) &AVLTree_T, NULL);
 	PyObject* list = Py_BuildValue("[]");	
-	BinaryCursor* bc = bc_init((AVLNode_O*)self->root, 0);
+	BinaryCursor* bc = bc_init((AVLNode*)self->root, 0);
 
 	for (int i=0;i<n;i++){
 		if (!bc_moveToNextNode(bc)) break;
-		AVLNode_O* node = bc_getCurrentNode(bc);
+		AVLNode* node = bc_getCurrentNode(bc);
 		PyObject_CallMethodObjArgs(list, Py_BuildValue("s", "append"), Py_BuildValue("(OO)", node->key, node->value), NULL);
 	}
 	
@@ -636,29 +707,23 @@ static Py_ssize_t tree_size(AVLTree_O* self){
 
 }
 
-static int value_in_tree(AVLTree_O* self, PyObject* value){
-	if (avl_search(self, value) == Py_None) return 0;
-	return 1;
-}
-
 
 // iter functions
 
 static PyObject* avl_iter(AVLTree_O* self){
+	self->cursor = bc_init((AVLNode*) self->root, 0);
 	Py_INCREF(self);
-	self->cursor = bc_init((AVLNode_O*) self->root, 0);
 	return (PyObject*)self;
 }
 
 
 static PyObject* avl_iter_next(AVLTree_O* self){
 	if (bc_moveToNextNode(self->cursor)){
-		AVLNode_O* n = bc_getCurrentNode(self->cursor);
+		AVLNode* n = bc_getCurrentNode(self->cursor);
 		
 		PyObject* ret = Py_BuildValue("(OO)", n->key, n->value);
 		return ret;
 	}
-	Py_DECREF(self);
 	bc_dealloc(self->cursor);
 	return NULL;
 

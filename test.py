@@ -6,14 +6,37 @@ Created on Mon Jul  9 17:22:35 2018
 @author: alex
 """
 
+
+
+
 import astruct as a
 import numpy as np
 import time
 
 
 t = a.AVLTree()
+while (True):
+    
+    arr = np.random.randint(0, 100, (100, 2))
+    t.push(arr)
+    
+    t.delete(np.random.randint(0, 100, int(len(t)*.1)))
+    
+    print(len(list(t)) == len(t))
+    """
+        if not t.height_test() or not t.balance_test():
+            print(i)
+            break
+          
+    if not t.balance_test() or not t.height_test():
+        break
+     
+    """
+#print(list(t))
 
+#¤input()
 
+"""
 t.push(np.random.randint(0, 1000, (10, 2)))
 t.push(np.random.randint(0, 1000, (10, 2)))
 
@@ -32,15 +55,20 @@ assert t.balance_test(), "Tree is not propery balanced"
 
 t.push(1000, 10)
 assert 10 == t.search(1000)
-
 t.delete(1000)
-
 assert t.search(1000) == None, "Node not deleted"
+arr = np.random.randint(0, 1000, (500, 2))
+t.push(arr)
+t.delete(arr[:, 0])
 
-arr = [[10, 3], [30, 400], [1000, 50]]
+print(t.balance_test())
+
+
+arr = [[10, 3], [30, 400], [1000, 50], [1, 43], [143, 2], [53, 1], [545, 43526], [2456, "what ever"]]
 
 t.push(arr)
-print(len(t))
+t.delete([k for k, v in arr])
+#print(list(t))
 
 
 
@@ -68,4 +96,7 @@ start_time = time.time()
 tt.push(arr)
 
 print("10k batch insert time: {} i/s".format(10000/(time.time()-start_time)))
+
+
+"""
 
